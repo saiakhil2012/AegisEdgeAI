@@ -779,6 +779,279 @@ Error Handling: Aligned with Standard Mode
 - 🔍 **Easier Troubleshooting**: Familiar error format regardless of deployment mode
 - 📈 **Better Observability**: Consistent logging and error tracking across modes
 
+---
+
+## Test 4: GPU Metrics Integration (AI/ML Edge Workload)
+
+This test demonstrates integration of GPU telemetry from DCGM exporters into the AegisEdgeAI zero-trust framework. GPU metrics follow the same trust chain as system and application metrics: TPM signing → Gateway validation → Collector storage.
+
+**Architecture**: External DCGM exporter → Agent scrapes Prometheus metrics → Signs with TPM → Sends through Gateway → Collector validates and stores
+
+**Transport Options**:
+- **UDS (Default)**: Secure file system-based communication, ~1ms latency
+- **HTTP (Explicit)**: Network-based scraping, ~3ms latency
+
+### Setup: Start DCGM GPU Exporter
+
+**Development/Testing** (Fake GPU Exporter with UDS support):
+```bash
+docker run -d \
+  --name dcgm-fake-gpu-exporter \
+  -p 9400:9400 \
+  -v /tmp/dcgm-metrics:/var/run/dcgm \
+  -e NUM_FAKE_GPUS=4 \
+  -e ENABLE_UDS=true \
+  -e METRIC_PROFILE=wave \
+  ghcr.io/saiakhil2012/dcgm-fake-gpu-exporter:latest
+
+# Verify exporter is running (HTTP)
+curl http://localhost:9400/metrics | grep -E "(dcgm_gpu_utilization|dcgm_gpu_temp)"
+
+# Verify UDS socket exists
+ls -la /tmp/dcgm-metrics/metrics.sock
+```
+
+**Production** (Real NVIDIA DCGM - HTTP only):
+```bash
+docker run -d \
+  --name dcgm-exporter \
+  --runtime=nvidia \
+  --gpus all \
+  -p 9400:9400 \
+  nvcr.io/nvidia/k8s/dcgm-exporter:latest
+
+# Verify exporter is running
+curl http://localhost:9400/metrics | grep -E "(dcgm_gpu_utilization|dcgm_gpu_temp)"
+```
+
+**Note**: Real NVIDIA DCGM exporter only supports HTTP endpoint. UDS is available in the fake exporter for development testing of security features.
+
+---
+
+### Test 4.1: GPU Metrics - UDS Transport (Secure Default)
+
+This test demonstrates GPU metric collection using Unix Domain Sockets for secure, low-latency communication.
+
+**Why UDS?**
+- 🔒 No network exposure (file system only)
+- ⚡ Lower latency (~1ms vs ~3ms)
+- ✅ Security-first for local agents
+
+**Window 1 - Main Terminal**
+```bash
+# Create GPU-enabled agent
+python3 create_agent.py agent-gpu-001
+
+# Start the agent
+python3 start_agent.py agent-gpu-001
+
+# Test GPU metrics with UDS (default - no params needed!)
+curl -X POST "https://localhost:8401/metrics/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"metric_type": "gpu"}' \
+  --insecure
+```
+
+**Expected Result**: Agent scrapes GPU metrics via UDS, signs with TPM, and sends through gateway successfully.
+
+**Expected Response**:
+```json
+{
+  "status": "success",
+  "payload_id": "abc123def456",
+  "transport": "uds"
+}
+```
+
+**Verification**:
+```bash
+# Check collector logs for GPU metrics
+tail -f logs/collector.log | grep "gpu"
+
+# Verify UDS transport in agent logs
+tail -f logs/agent-gpu-001.log | grep "UDS"
+```
+
+---
+
+### Test 4.2: GPU Metrics - HTTP Transport (Explicit Network Mode)
+
+This test demonstrates GPU metric collection using HTTP when network-based scraping is required.
+
+**When to use HTTP?**
+- 🌐 Network access needed (different container/host or same host via network)
+- 📊 Prometheus integration
+- 🔄 Legacy compatibility
+
+**Window 1 - Main Terminal**
+```bash
+# Test GPU metrics with HTTP mode (explicit)
+curl -X POST "https://localhost:8401/metrics/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metric_type": "gpu",
+    "use_http": true,
+    "dcgm_endpoint": "http://localhost:9400/metrics"
+  }' \
+  --insecure
+```
+
+**Expected Result**: Agent scrapes GPU metrics via HTTP, signs with TPM, and sends through gateway successfully.
+
+**Expected Response**:
+```json
+{
+  "status": "success",
+  "payload_id": "xyz789abc012",
+  "transport": "http"
+}
+```
+
+---
+
+### Test 4.3: GPU Metrics - Error Handling
+
+This test demonstrates graceful handling when DCGM exporter is unavailable.
+
+**Window 1 - Main Terminal**
+```bash
+# Stop DCGM exporter to simulate failure
+docker stop dcgm-fake-gpu-exporter
+
+# Test with UDS (should fail gracefully)
+curl -X POST "https://localhost:8401/metrics/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"metric_type": "gpu"}' \
+  --insecure
+```
+
+**Expected Result**: Agent detects exporter unavailability and returns clear error message.
+
+**Expected Response**:
+```json
+{
+  "status": "error",
+  "message": "Failed to scrape GPU metrics: [Errno 2] No such file or directory",
+  "transport": "uds"
+}
+```
+
+**Cleanup**:
+```bash
+# Restart DCGM exporter
+docker start dcgm-fake-gpu-exporter
+```
+
+---
+
+### Test 4.4: Multi-GPU Cluster Monitoring
+
+This test demonstrates centralized monitoring of multiple GPU nodes with TPM-signed telemetry.
+
+**Scenario**: Multiple agents on different hosts (or ports for testing) scrape local DCGM exporters securely.
+
+**Window 1 - Main Terminal** (Node 1):
+```bash
+python3 create_agent.py agent-gpu-node1
+
+curl -X POST "https://localhost:8401/metrics/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"metric_type": "gpu"}' \
+  --insecure
+```
+
+**Window 2 - Second Terminal** (Node 2):
+```bash
+python3 create_agent.py agent-gpu-node2
+python3 start_agent.py agent-gpu-node2
+
+curl -X POST "https://localhost:8402/metrics/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"metric_type": "gpu"}' \
+  --insecure
+```
+
+**Expected Result**: Both agents successfully send GPU metrics through the same Gateway → Collector pipeline, each maintaining unique TPM identity.
+
+**Benefits**:
+- All GPU metrics flow through same trust chain
+- Each agent has unique TPM-backed identity
+- Centralized validation and storage
+- UDS provides secure local communication
+
+---
+
+### Production Migration: Fake → Real GPU Exporter
+
+This demonstrates the transition from development to production. **Note**: Real NVIDIA DCGM only supports HTTP, so production deployments use HTTP mode.
+
+**Development Setup** (Already running from Test 4.1):
+```bash
+# Fake exporter with UDS enabled (dev/test only)
+docker ps | grep dcgm-fake-gpu-exporter
+```
+
+**Production Migration**:
+```bash
+# Stop development exporter
+docker stop dcgm-fake-gpu-exporter
+docker rm dcgm-fake-gpu-exporter
+
+# Start production NVIDIA DCGM exporter (HTTP only)
+docker run -d \
+  --name dcgm-exporter-prod \
+  --runtime=nvidia \
+  --gpus all \
+  -p 9400:9400 \
+  nvcr.io/nvidia/k8s/dcgm-exporter:latest
+
+# Verify exporter is running
+curl http://localhost:9400/metrics | grep -E "(dcgm_gpu_utilization|dcgm_gpu_temp)"
+
+# Test with HTTP mode (required for production)
+curl -X POST "https://localhost:8401/metrics/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metric_type": "gpu",
+    "use_http": true,
+    "dcgm_endpoint": "http://localhost:9400/metrics"
+  }' \
+  --insecure
+```
+
+**Result**: ✅ **Zero agent code changes** - just switch from UDS to HTTP mode in the request!
+
+**Transport Comparison**:
+
+| Aspect | UDS (Dev/Test Only) | HTTP (Production) |
+|--------|---------------------|-------------------|
+| **Security** | 🔒 File system only | 🌐 Network stack |
+| **Performance** | ⚡ ~1ms latency | ⏱️ ~3ms latency |
+| **Use Case** | Dev/test with fake exporter | Production with real GPUs |
+| **Agent Code** | ✅ Zero changes | ✅ Zero changes |
+| **Docker** | Volume mount (fake only) | Port mapping |
+| **NVIDIA DCGM** | ❌ Not supported | ✅ Supported |
+
+---
+
+### Verification & Troubleshooting
+
+**Monitor GPU metric flow**:
+```bash
+# Check collector logs for GPU metrics
+tail -f logs/collector.log | grep "gpu"
+
+# Check agent logs for UDS/HTTP transport
+tail -f logs/agent-gpu-001.log
+```
+
+**Common Issues**:
+- **Connection refused**: Verify DCGM container is running (`docker ps | grep dcgm`)
+- **No metrics in logs**: Check agent logs for scraping errors
+- **Gateway rejection**: Verify agent is in allowlist (`python3 manage_agents.py --action list`)
+
+---
+
 ## For Utils and Debugging 
 Refer [README_utils.md](README_utils.md)
 
