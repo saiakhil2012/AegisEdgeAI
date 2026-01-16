@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/google/go-tpm/legacy/tpm2"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hcl"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	nodeattestorv1 "github.com/spiffe/spire-plugin-sdk/proto/spire/plugin/server/nodeattestor/v1"
@@ -28,6 +29,9 @@ import (
 // We use a 32 bytes nonce to provide enough cryptographical randomness and to be
 // consistent with other nonces sizes around the project.
 const devIDChallengeNonceSize = 32
+
+// Maximum certificate chain depth to prevent resource exhaustion attacks
+const maxCertChainDepth = 10
 
 func BuiltIn() catalog.BuiltIn {
 	return builtin(New())
@@ -91,8 +95,9 @@ type Plugin struct {
 	nodeattestorv1.UnsafeNodeAttestorServer
 	configv1.UnsafeConfigServer
 
-	m sync.Mutex
-	c *config
+	log hclog.Logger
+	m   sync.Mutex
+	c   *config
 }
 
 func New() *Plugin {
@@ -111,6 +116,10 @@ func (p *Plugin) Attest(stream nodeattestorv1.NodeAttestor_AttestServer) error {
 		return status.Error(codes.FailedPrecondition, "not configured")
 	}
 
+	if p.log != nil {
+		p.log.Debug("Starting TPM DevID attestation")
+	}
+
 	payload := req.GetPayload()
 	if payload == nil {
 		return status.Error(codes.InvalidArgument, "missing attestation payload")
@@ -126,6 +135,11 @@ func (p *Plugin) Attest(stream nodeattestorv1.NodeAttestor_AttestServer) error {
 	// Decode attestation data
 	if len(attData.DevIDCert) == 0 {
 		return status.Error(codes.InvalidArgument, "no DevID certificate to attest")
+	}
+
+	// Validate certificate chain depth to prevent resource exhaustion
+	if len(attData.DevIDCert) > maxCertChainDepth {
+		return status.Errorf(codes.InvalidArgument, "certificate chain too long: %d certificates (max %d)", len(attData.DevIDCert), maxCertChainDepth)
 	}
 
 	devIDCert, err := x509.ParseCertificate(attData.DevIDCert[0])
@@ -146,6 +160,10 @@ func (p *Plugin) Attest(stream nodeattestorv1.NodeAttestor_AttestServer) error {
 	chains, err := verifyDevIDSignature(devIDCert, devIDIntermediates, conf.devIDRoots)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "unable to verify DevID signature: %v", err)
+	}
+
+	if p.log != nil {
+		p.log.Debug("DevID certificate chain validated", "subject", devIDCert.Subject.String(), "issuer", devIDCert.Issuer.String())
 	}
 
 	// Issue a DevID challenge (to prove the possession of the DevID private key).
@@ -212,6 +230,10 @@ func (p *Plugin) Attest(stream nodeattestorv1.NodeAttestor_AttestServer) error {
 	}
 	selectors := buildSelectorValues(devIDCert, chains)
 
+	if p.log != nil {
+		p.log.Info("TPM DevID attestation successful", "spiffe_id", spiffeID.String(), "cn", devIDCert.Subject.CommonName)
+	}
+
 	return stream.Send(&nodeattestorv1.AttestResponse{
 		Response: &nodeattestorv1.AttestResponse_AgentAttributes{
 			AgentAttributes: &nodeattestorv1.AgentAttributes{
@@ -243,6 +265,10 @@ func (p *Plugin) Validate(ctx context.Context, req *configv1.ValidateRequest) (*
 		Valid: err == nil,
 		Notes: notes,
 	}, err
+}
+
+func (p *Plugin) SetLogger(log hclog.Logger) {
+	p.log = log
 }
 
 func (p *Plugin) getConfiguration() *config {
@@ -377,6 +403,12 @@ func verifyEKsMatch(ekCert *x509.Certificate, ekPub tpm2.Public) error {
 	keyFromCert, ok := ekCert.PublicKey.(*rsa.PublicKey)
 	if !ok {
 		return errors.New("key from certificate is not an RSA key")
+	}
+
+	// Validate RSA key size (minimum 2048 bits for security)
+	keySize := keyFromCert.N.BitLen()
+	if keySize < 2048 {
+		return fmt.Errorf("RSA key size too small: %d bits (minimum 2048 required)", keySize)
 	}
 
 	cryptoKey, err := ekPub.Key()

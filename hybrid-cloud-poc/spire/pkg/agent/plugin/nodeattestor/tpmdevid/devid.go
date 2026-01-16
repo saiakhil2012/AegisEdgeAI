@@ -236,6 +236,9 @@ func (p *Plugin) Configure(_ context.Context, req *configv1.ConfigureRequest) (*
 			return nil, status.Errorf(codes.Internal, "tpm autodetection failed: %v", err)
 		}
 		newConfig.DevicePath = tpmPath
+		p.log.Debug("TPM device auto-detected", "device_path", tpmPath)
+	} else {
+		p.log.Debug("Using configured TPM device", "device_path", newConfig.DevicePath)
 	}
 
 	p.m.Lock()

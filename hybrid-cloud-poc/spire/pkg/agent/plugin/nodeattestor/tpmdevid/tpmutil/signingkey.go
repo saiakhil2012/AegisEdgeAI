@@ -46,7 +46,7 @@ func (k *SigningKey) Sign(data []byte) ([]byte, error) {
 			return getSignatureBytes(sig)
 
 		case isRetry(err):
-			k.log.Warn(fmt.Sprintf("TPM was not able to start the command 'Sign'. Retrying: attempt (%d/%d)", i, maxAttempts))
+			k.log.Warn("TPM sign command failed, retrying", "attempt", i, "max_attempts", maxAttempts)
 			time.Sleep(time.Millisecond * 500)
 			continue
 
@@ -72,7 +72,7 @@ func (k *SigningKey) Certify(object tpmutil.Handle, objectPassword string) ([]by
 			return certifiedDevID, certificationSignature, nil
 
 		case isRetry(err):
-			k.log.Warn(fmt.Sprintf("TPM was not able to start the command 'Certify'. Retrying: attempt (%d/%d)", i, maxAttempts))
+			k.log.Warn("TPM certify command failed, retrying", "attempt", i, "max_attempts", maxAttempts)
 			time.Sleep(time.Millisecond * 500)
 
 		default:

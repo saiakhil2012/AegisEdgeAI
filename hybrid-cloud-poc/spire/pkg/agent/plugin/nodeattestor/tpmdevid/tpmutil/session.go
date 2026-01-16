@@ -68,6 +68,7 @@ func NewSession(scfg *SessionConfig) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot open TPM at %q: %w", scfg.DevicePath, err)
 	}
+	scfg.Log.Debug("TPM session opened", "device_path", scfg.DevicePath)
 
 	// Create session
 	tpm := &Session{
@@ -140,14 +141,14 @@ func (c *Session) Close() {
 	if c.devID != nil {
 		err := c.devID.Close()
 		if err != nil {
-			c.log.Warn(fmt.Sprintf("Failed to close DevID handle: %v", err))
+			c.log.Warn("Failed to close DevID handle", "error", err)
 		}
 	}
 
 	if c.ak != nil {
 		err := c.ak.Close()
 		if err != nil {
-			c.log.Warn(fmt.Sprintf("Failed to close attestation key handle: %v", err))
+			c.log.Warn("Failed to close attestation key handle", "error", err)
 		}
 	}
 
@@ -162,7 +163,7 @@ func (c *Session) Close() {
 
 		err := c.rwc.Close()
 		if err != nil {
-			c.log.Warn(fmt.Sprintf("Failed to close TPM: %v", err))
+			c.log.Warn("Failed to close TPM connection", "error", err)
 		}
 	}
 }
@@ -395,7 +396,7 @@ func (c *Session) createPolicySessionForEK() (tpmutil.Handle, error) {
 func (c *Session) flushContext(handle tpmutil.Handle) {
 	err := tpm2.FlushContext(c.rwc, handle)
 	if err != nil {
-		c.log.Warn(fmt.Sprintf("Failed to flush handle %v: %v", handle, err))
+		c.log.Warn("Failed to flush TPM handle", "handle", handle, "error", err)
 	}
 }
 
