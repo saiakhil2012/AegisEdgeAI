@@ -129,8 +129,8 @@ echo "SPIRE & Keylime Components"
 echo "=========================================="
 
 echo "--- SPIRE Server Binary ---"
-run_cmd "test -f hybrid-cloud-poc/spire/bin/spire-server && echo 'SPIRE server binary found' || echo 'SPIRE server binary not found'"
-run_cmd "test -f hybrid-cloud-poc/spire/bin/spire-agent && echo 'SPIRE agent binary found' || echo 'SPIRE agent binary not found'"
+run_cmd "test -f build/spire-binaries/spire-server && echo 'SPIRE server binary found' || echo 'SPIRE server binary not found'"
+run_cmd "test -f build/spire-binaries/spire-agent && echo 'SPIRE agent binary found' || echo 'SPIRE agent binary not found'"
 
 echo ""
 echo "--- Keylime Components ---"

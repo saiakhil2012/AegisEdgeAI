@@ -20,7 +20,7 @@ echo ""
 # Verify overlay exists
 if [ ! -d "$OVERLAY_DIR" ]; then
     echo "❌ Overlay directory not found: $OVERLAY_DIR"
-    echo "   Run ./scripts/spire-extract-changes.sh first"
+    echo "   The spire-overlay directory contains our custom patches and plugins"
     exit 1
 fi
 

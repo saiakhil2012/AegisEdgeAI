@@ -1160,7 +1160,7 @@ PYEOF
 
         # Last resort: Try to get agent SVID from SPIRE server using agent SPIFFE ID
         # We can query the server for the agent's SVID
-        local spire_server="${PROJECT_DIR}/spire/bin/spire-server"
+        local spire_server="${PROJECT_DIR}/../build/spire-binaries/spire-server"
         if [ -f "$spire_server" ]; then
             # Get agent SPIFFE ID from logs
             local agent_spiffe_id=$(grep "Successfully reattested node" "$agent_log" | tail -1 | \
@@ -1281,7 +1281,7 @@ else
 fi
 
 # Check SPIRE Server (port 8081)
-SPIRE_SERVER="${PROJECT_DIR}/spire/bin/spire-server"
+SPIRE_SERVER="${PROJECT_DIR}/../build/spire-binaries/spire-server"
 if [ -f "${SPIRE_SERVER}" ]; then
     if ! "${SPIRE_SERVER}" healthcheck -socketPath /tmp/spire-server/private/api.sock >/dev/null 2>&1; then
         echo -e "${RED}  ✗ SPIRE Server is not running or not ready${NC}"
@@ -2498,7 +2498,7 @@ export KEYLIME_AGENT_PORT="${KEYLIME_AGENT_PORT:-9002}"
 echo "  Using rust-keylime agent endpoint: ${KEYLIME_AGENT_IP}:${KEYLIME_AGENT_PORT}"
 
 # Check if SPIRE Agent binary exists or needs a rebuild
-SPIRE_AGENT="${PROJECT_DIR}/spire/bin/spire-agent"
+SPIRE_AGENT="${PROJECT_DIR}/../build/spire-binaries/spire-agent"
 NEEDS_REBUILD=false
 
 if [ ! -f "${SPIRE_AGENT}" ]; then
@@ -2525,44 +2525,23 @@ if [ "$NEEDS_REBUILD" = "true" ]; then
         echo -e "${GREEN}============================================================${NC}"
         echo ""
         echo "To complete full integration test:"
-        echo "  1. Build SPIRE Agent: cd ${PROJECT_DIR}/spire && make bin/spire-agent"
+        echo "  1. Build SPIRE: ./scripts/spire-build.sh"
         echo "  2. Run this script again"
         exit 0
     else
-        echo -e "${YELLOW}  ⚠ SPIRE Agent binary not found, building...${NC}"
-        cd "${PROJECT_DIR}/spire"
-
-        # Ensure required files exist for Makefile
-        if [ ! -f ".go-version" ]; then
-            echo "1.25.3" > .go-version
-        fi
-        if [ ! -f ".spire-tool-versions" ]; then
-            cat > .spire-tool-versions << 'EOF'
-golangci-lint v1.60.0
-markdown_lint v0.40.0
-protoc 30.2
-EOF
-        fi
-
-        # Try building with Makefile first
-        if make bin/spire-agent > /tmp/spire-agent-build.log 2>&1; then
-            echo -e "${GREEN}  ✓ SPIRE Agent built successfully${NC}"
+        echo -e "${YELLOW}  ⚠ SPIRE Agent binary not found, building from overlay...${NC}"
+        cd "${PROJECT_DIR}/.."
+        if ./scripts/spire-build.sh > /tmp/spire-build.log 2>&1; then
+            echo -e "${GREEN}  ✓ SPIRE binaries built successfully from overlay${NC}"
         else
-            echo -e "${YELLOW}  ⚠ Makefile build failed, trying direct go build...${NC}"
-            # Fallback to direct go build if Makefile fails
-            mkdir -p bin
-            if go build -o bin/spire-agent ./cmd/spire-agent > /tmp/spire-agent-build.log 2>&1; then
-                echo -e "${GREEN}  ✓ SPIRE Agent built successfully (using go build)${NC}"
-            else
-                echo -e "${RED}  ✗ Failed to build SPIRE Agent${NC}"
-                echo "  Build log:"
-                tail -30 /tmp/spire-agent-build.log
-                echo ""
-                echo "  Troubleshooting:"
-                echo "    1. Ensure Go 1.25.3 is installed: go version"
-                echo "    2. Try building manually: cd ${PROJECT_DIR}/spire && make bin/spire-agent"
-                exit 1
-            fi
+            echo -e "${RED}  ✗ Failed to build SPIRE from overlay${NC}"
+            echo "  Build log:"
+            tail -30 /tmp/spire-build.log
+            echo ""
+            echo "  Troubleshooting:"
+            echo "    1. Ensure Go 1.23+ is installed: go version"
+            echo "    2. Try building manually: ./scripts/spire-build.sh"
+            exit 1
         fi
         cd "${PROJECT_DIR}"
     fi
@@ -3435,8 +3414,8 @@ if [ "$COMPONENTS_OK" = true ] || [ -S /tmp/spire-agent/public/api.sock ]; then
                     else
                         echo -e "${YELLOW}    ⚠ SPIRE bundle file not created, trying alternative method...${NC}"
                         # Try using SPIRE server CLI to get bundle
-                        if [ -f "${PROJECT_DIR}/spire/bin/spire-server" ]; then
-                            "${PROJECT_DIR}/spire/bin/spire-server" bundle show -format pem \
+                        if [ -f "${PROJECT_DIR}/../build/spire-binaries/spire-server" ]; then
+                            "${PROJECT_DIR}/../build/spire-binaries/spire-server" bundle show -format pem \
                                 -socketPath /tmp/spire-server/private/api.sock > "$SPIRE_BUNDLE" 2>/dev/null && \
                                 echo -e "${GREEN}    ✓ SPIRE trust bundle extracted via server CLI${NC}" || \
                                 echo -e "${YELLOW}    ⚠ Failed to extract bundle, continuing without verification${NC}"
@@ -3445,8 +3424,8 @@ if [ "$COMPONENTS_OK" = true ] || [ -S /tmp/spire-agent/public/api.sock ]; then
                 else
                     echo -e "${YELLOW}    ⚠ Failed to extract SPIRE bundle via Python script, trying server CLI...${NC}"
                     # Try using SPIRE server CLI as fallback
-                    if [ -f "${PROJECT_DIR}/spire/bin/spire-server" ]; then
-                        "${PROJECT_DIR}/spire/bin/spire-server" bundle show -format pem \
+                    if [ -f "${PROJECT_DIR}/../build/spire-binaries/spire-server" ]; then
+                        "${PROJECT_DIR}/../build/spire-binaries/spire-server" bundle show -format pem \
                             -socketPath /tmp/spire-server/private/api.sock > "$SPIRE_BUNDLE" 2>/dev/null && \
                             echo -e "${GREEN}    ✓ SPIRE trust bundle extracted via server CLI${NC}" || \
                             echo -e "${YELLOW}    ⚠ Failed to extract bundle, continuing without verification${NC}"
@@ -3455,8 +3434,8 @@ if [ "$COMPONENTS_OK" = true ] || [ -S /tmp/spire-agent/public/api.sock ]; then
             else
                 echo -e "${YELLOW}    ⚠ fetch-spire-bundle.py not found, trying server CLI...${NC}"
                 # Try using SPIRE server CLI
-                if [ -f "${PROJECT_DIR}/spire/bin/spire-server" ]; then
-                    "${PROJECT_DIR}/spire/bin/spire-server" bundle show -format pem \
+                if [ -f "${PROJECT_DIR}/../build/spire-binaries/spire-server" ]; then
+                    "${PROJECT_DIR}/../build/spire-binaries/spire-server" bundle show -format pem \
                         -socketPath /tmp/spire-server/private/api.sock > "$SPIRE_BUNDLE" 2>/dev/null && \
                         echo -e "${GREEN}    ✓ SPIRE trust bundle extracted via server CLI${NC}" || \
                         echo -e "${YELLOW}    ⚠ Failed to extract bundle, continuing without verification${NC}"

@@ -563,7 +563,7 @@ if [ "$IS_SAME_HOST" = "true" ]; then
     if [ ! -f /tmp/spire-bundle.pem ]; then
         # On the same host, we likely have spire-server available (started in test_control_plane.sh)
         if [ -S /tmp/spire-server/private/api.sock ]; then
-            if ~/AegisSovereignAI/hybrid-cloud-poc/spire/bin/spire-server bundle show -format pem -socketPath /tmp/spire-server/private/api.sock > /tmp/spire-bundle.pem 2>/dev/null; then
+            if ~/AegisSovereignAI/build/spire-binaries/spire-server bundle show -format pem -socketPath /tmp/spire-server/private/api.sock > /tmp/spire-bundle.pem 2>/dev/null; then
                 printf '  ✓ SPIRE bundle generated using SPIRE server command\n'
             fi
         fi
@@ -591,7 +591,7 @@ else
         # Bundle doesn't exist, try to generate it via server command first (more reliable if on CP host)
         if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes \
             "${SPIRE_CLIENT_USER}@${SPIRE_CLIENT_HOST}" \
-            "test -S /tmp/spire-server/private/api.sock && ~/AegisSovereignAI/hybrid-cloud-poc/spire/bin/spire-server bundle show -format pem -socketPath /tmp/spire-server/private/api.sock > /tmp/spire-bundle.pem" 2>/dev/null; then
+            "test -S /tmp/spire-server/private/api.sock && ~/AegisSovereignAI/build/spire-binaries/spire-server bundle show -format pem -socketPath /tmp/spire-server/private/api.sock > /tmp/spire-bundle.pem" 2>/dev/null; then
             printf '  ✓ SPIRE bundle generated on %s via server command\n' "${SPIRE_CLIENT_HOST}"
         else
             # Try agent Workload API if server command failed/not available
