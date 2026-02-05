@@ -1635,23 +1635,20 @@ export KEYLIME_AGENT_IP="${KEYLIME_AGENT_IP:-127.0.0.1}"
 export KEYLIME_AGENT_PORT="${KEYLIME_AGENT_PORT:-9002}"
 echo "  Using rust-keylime agent endpoint: ${KEYLIME_AGENT_IP}:${KEYLIME_AGENT_PORT}"
 
-# Check if SPIRE Server binary exists or needs a rebuild
-SPIRE_SERVER="${PROJECT_DIR}/spire/bin/spire-server"
+# Use overlay-built SPIRE binaries
+SPIRE_SERVER="${PROJECT_DIR}/../build/spire-binaries/spire-server"
 NEEDS_REBUILD=false
 
 if [ ! -f "${SPIRE_SERVER}" ]; then
-    echo "  SPIRE Server binary not found, need to build."
+    echo "  SPIRE Server binary not found at overlay location, need to build."
     NEEDS_REBUILD=true
 elif [ "${FORCE_BUILD:-false}" = "true" ]; then
     echo "  Forced build requested."
     NEEDS_REBUILD=true
 else
-    # Check if any .go file in spire directory is newer than the binary
-    # We limit to last 30 days to avoid scanning too many files if something is weird
-    if [ -n "$(find "${PROJECT_DIR}/spire" -name "*.go" -newer "${SPIRE_SERVER}" -print -quit 2>/dev/null)" ]; then
-        echo -e "${YELLOW}  ⚠ SPIRE Source code changes detected, rebuilding...${NC}"
-        NEEDS_REBUILD=true
-    fi
+    # Check if overlay files changed (skip rebuild check for now since overlay is external)
+    # The overlay system manages its own build logic
+    NEEDS_REBUILD=false
 fi
 
 if [ "$NEEDS_REBUILD" = "true" ]; then
@@ -1665,45 +1662,13 @@ if [ "$NEEDS_REBUILD" = "true" ]; then
         echo -e "${GREEN}============================================================${NC}"
         echo ""
         echo "To complete control plane setup:"
-        echo "  1. Build SPIRE Server: cd ${PROJECT_DIR}/spire && make bin/spire-server"
+        echo "  1. Build SPIRE from overlay: ${PROJECT_DIR}/../scripts/spire-build.sh"
         echo "  2. Run this script again"
         exit 0
     else
-        echo -e "${YELLOW}  ⚠ SPIRE Server binary not found, building...${NC}"
-        cd "${PROJECT_DIR}/spire"
-
-        # Ensure required files exist for Makefile
-        if [ ! -f ".go-version" ]; then
-            echo "1.25.3" > .go-version
-        fi
-        if [ ! -f ".spire-tool-versions" ]; then
-            cat > .spire-tool-versions << 'EOF'
-golangci-lint v1.60.0
-markdown_lint v0.40.0
-protoc 30.2
-EOF
-        fi
-
-        # Try building with Makefile first
-        if make bin/spire-server > /tmp/spire-server-build.log 2>&1; then
-            echo -e "${GREEN}  ✓ SPIRE Server built successfully${NC}"
-        else
-            echo -e "${YELLOW}  ⚠ Makefile build failed, trying direct go build...${NC}"
-            # Fallback to direct go build if Makefile fails
-            mkdir -p bin
-            if go build -o bin/spire-server ./cmd/spire-server > /tmp/spire-server-build.log 2>&1; then
-                echo -e "${GREEN}  ✓ SPIRE Server built successfully (using go build)${NC}"
-            else
-                echo -e "${RED}  ✗ Failed to build SPIRE Server${NC}"
-                echo "  Build log:"
-                tail -30 /tmp/spire-server-build.log
-                echo ""
-                echo "  Troubleshooting:"
-                echo "    1. Ensure Go 1.25.3 is installed: go version"
-                echo "    2. Try building manually: cd ${PROJECT_DIR}/spire && make bin/spire-server"
-                exit 1
-            fi
-        fi
+        echo -e "${YELLOW}  ⚠ SPIRE Server binary not found, building from overlay...${NC}"
+        cd "${PROJECT_DIR}/.."
+        ./scripts/spire-build.sh
         cd "${PROJECT_DIR}"
     fi
 fi

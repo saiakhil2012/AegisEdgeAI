@@ -156,20 +156,20 @@ else
 fi
 
 echo ""
-echo "Step 6: Verify CI compatibility"
+echo "Step 6: Verify binaries are ready"
 echo "-------------------------------"
 
-# Check if symlinks exist for CI backward compatibility
-if [ -L "hybrid-cloud-poc/spire/bin/spire-server" ]; then
-    echo -e "${GREEN}✓${NC} CI compatibility symlink exists (spire-server)"
+# Check if binaries exist in build directory
+if [ -f "build/spire-binaries/spire-server" ]; then
+    echo -e "${GREEN}✓${NC} spire-server binary found"
 else
-    echo -e "${YELLOW}ℹ️  INFO${NC}: No CI symlink for spire-server (will be created by CI)"
+    echo -e "${RED}✗${NC} spire-server binary not found in build/spire-binaries/"
 fi
 
-if [ -L "hybrid-cloud-poc/spire/bin/spire-agent" ]; then
-    echo -e "${GREEN}✓${NC} CI compatibility symlink exists (spire-agent)"
+if [ -f "build/spire-binaries/spire-agent" ]; then
+    echo -e "${GREEN}✓${NC} spire-agent binary found"
 else
-    echo -e "${YELLOW}ℹ️  INFO${NC}: No CI symlink for spire-agent (will be created by CI)"
+    echo -e "${RED}✗${NC} spire-agent binary not found in build/spire-binaries/"
 fi
 
 echo ""

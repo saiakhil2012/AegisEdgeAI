@@ -128,18 +128,21 @@ jobs:
 
                   groups | grep tss && echo "User is in tss group" || echo "Warning: User not in tss group"
 
-            - name: Build SPIRE Components
+            - name: Build SPIRE Components from Overlay
               timeout-minutes: 10
               run: |
-                  echo "=== Building SPIRE ==="
-                  cd hybrid-cloud-poc
-
-                  if [ -f "spire/bin/spire-server" ] && [ -f "spire/bin/spire-agent" ]; then
-                      echo "SPIRE binaries already exist."
+                  echo "=== Building SPIRE from Overlay System ==="
+                  
+                  if [ -f "build/spire-binaries/spire-server" ] && [ -f "build/spire-binaries/spire-agent" ]; then
+                      echo "SPIRE binaries already exist at build/spire-binaries/"
                   else
-                      cd spire
-                      make bin/spire-server bin/spire-agent
+                      echo "Building SPIRE from overlay (upstream v1.10.3 + custom patches)..."
+                      ./scripts/spire-build.sh
+                      echo "✓ SPIRE built from overlay system"
                   fi
+                  
+                  # Verify binaries exist
+                  ls -lh build/spire-binaries/spire-server build/spire-binaries/spire-agent
 
             - name: Build Rust-Keylime Agent
               timeout-minutes: 15
