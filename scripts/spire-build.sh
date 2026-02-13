@@ -10,7 +10,7 @@ BUILD_DIR="$PROJECT_ROOT/build"
 OVERLAY_DIR="$PROJECT_ROOT/spire-overlay"
 
 # Configuration
-SPIRE_VERSION="${SPIRE_VERSION:-v1.10.3}"
+SPIRE_VERSION="${SPIRE_VERSION:-v1.14.1}"
 SPIRE_REPO="https://github.com/spiffe/spire.git"
 SPIRE_API_SDK_REPO="https://github.com/spiffe/spire-api-sdk.git"
 

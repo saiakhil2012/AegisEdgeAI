@@ -9,7 +9,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEV_DIR="$PROJECT_ROOT/build/spire-dev"
 OVERLAY_DIR="$PROJECT_ROOT/spire-overlay"
 
-SPIRE_VERSION="${SPIRE_VERSION:-v1.10.3}"
+SPIRE_VERSION="${SPIRE_VERSION:-v1.14.1}"
 SPIRE_REPO="https://github.com/spiffe/spire.git"
 
 echo "🔧 Setting up SPIRE development environment"
