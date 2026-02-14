@@ -124,9 +124,9 @@ message BatchNewX509SVIDResponse {
         // The newly created X509-SVID. This will be set if the status is OK.
         spire.api.types.X509SVID svid = 2;
 
-        // Unified-Identity - Phase 1: SPIRE API & Policy Staging (Stubbed Keylime)
-        // Optional. Verified claims from Keylime about host geolocation, integrity, and GPU metrics.
-        repeated spire.api.types.AegisAttestedClaims aegis_attested_claims = 30;
+        // Hardware-attested claims for workload identity enrichment
+        // Optional. Verified claims from hardware attestation service about host geolocation, integrity, and hardware metrics.
+        repeated spire.api.types.HardwareAttestedClaims hardware_attested_claims = 30;
     }
 
     // Result for each X509-SVID requested (order is maintained).
@@ -197,9 +197,9 @@ message NewX509SVIDParams {
     // ignored. The X509-SVID attributes are determined by the entry.
     bytes csr = 2;
 
-    // Unified-Identity - Phase 1: SPIRE API & Policy Staging (Stubbed Keylime)
-    // Optional hardware-rooted PoR package for sovereign attestation.
-    optional spire.api.types.AegisSovereignAttestation aegis_sovereign_attestation = 20;
+    // Hardware-rooted attestation for sovereign workload identity
+    // Optional hardware-rooted proof-of-residency package for sovereign attestation.
+    optional spire.api.types.SovereignAttestation sovereign_attestation = 20;
 }
 
 message NewWITSVIDParams {

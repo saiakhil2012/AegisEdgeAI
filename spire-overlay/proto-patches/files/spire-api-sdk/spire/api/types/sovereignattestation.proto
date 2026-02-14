@@ -2,9 +2,9 @@ syntax = "proto3";
 package spire.api.types;
 option go_package = "github.com/spiffe/spire-api-sdk/proto/spire/api/types";
 
-// Unified-Identity - Phase 1: SPIRE API & Policy Staging (Stubbed Keylime)
-// A hardware-rooted PoR package produced by the Agent.
-message AegisSovereignAttestation {
+// Hardware-rooted attestation for sovereign workload identity
+// A hardware-rooted proof-of-residency package produced by the Agent.
+message SovereignAttestation {
     // Base64-encoded TPM Quote (portable string). Validation: non-empty, base64, size <= 64kB
     optional string tpm_signed_attestation = 1;
 
@@ -27,16 +27,16 @@ message AegisSovereignAttestation {
     optional string keylime_agent_uuid = 6;
 }
 
-// Unified-Identity - Phase 1: SPIRE API & Policy Staging (Stubbed Keylime)
-// AttestedClaims contains verified facts from Keylime about the host.
-message AegisAttestedClaims {
-    optional AegisGeolocation geolocation = 1;    // Geolocation object with type, sensor_id, and optional value
-    optional AegisMNOEndorsement mno_endorsement = 2; // Gen 4: Signed MNO endorsement
+// Hardware-attested claims for workload identity enrichment
+// AttestedClaims contains verified facts from hardware attestation service about the host.
+message HardwareAttestedClaims {
+    optional Geolocation geolocation = 1;    // Geolocation object with type, sensor_id, and optional value
+    optional MNOEndorsement mno_endorsement = 2; // Gen 4: Signed MNO endorsement
     optional string sovereignty_receipt = 3;     // Gen 4: ZKP proof of proximity
 }
 
 // Gen 4: MNOEndorsement represents a signed endorsement from a carrier
-message AegisMNOEndorsement {
+message MNOEndorsement {
     optional bool verified = 1;
     optional string endorsement_json = 2; // JSON-encoded endorsement data
     optional string signature = 3;        // EdDSA signature
@@ -45,7 +45,7 @@ message AegisMNOEndorsement {
 
 // Unified-Identity - Phase 1: SPIRE API & Policy Staging (Stubbed Keylime)
 // Geolocation represents geolocation sensor metadata
-message AegisGeolocation {
+message Geolocation {
     optional string type = 1;        // "mobile" or "gnss"
     optional string sensor_id = 2;   // Sensor identifier (e.g., USB ID "12d1:1433" for mobile)
     optional string value = 3;       // Optional for mobile, mandatory for gnss (e.g., GNSS coordinates)
