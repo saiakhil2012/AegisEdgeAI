@@ -24,6 +24,64 @@ jobs:
                   python3 scripts/add_license_headers.py --check --root .
               continue-on-error: false
 
+    spire-overlay-build:
+        name: Test SPIRE Overlay Build (v${{ matrix.spire-version }})
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        strategy:
+            fail-fast: false
+            matrix:
+                spire-version: ['1.14.1', 'main']
+        
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: '1.23'
+
+            - name: Install Build Dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y build-essential git
+
+            - name: Build SPIRE with Overlay (v${{ matrix.spire-version }})
+              env:
+                  SPIRE_VERSION: v${{ matrix.spire-version }}
+              run: |
+                  echo "Building SPIRE $SPIRE_VERSION with overlay..."
+                  ./scripts/spire-build.sh
+
+            - name: Verify Build Output
+              run: |
+                  echo "Checking binaries..."
+                  test -f build/spire-binaries/spire-server
+                  test -f build/spire-binaries/spire-agent
+                  
+                  echo "Verifying versions..."
+                  ./build/spire-binaries/spire-server --version
+                  ./build/spire-binaries/spire-agent --version
+
+            - name: Verify Proto Compilation
+              run: |
+                  echo "Checking custom proto types..."
+                  test -f build/spire-api-sdk/proto/spire/api/types/sovereignattestation.pb.go
+                  grep -q "SovereignAttestation" build/spire-api-sdk/proto/spire/api/types/sovereignattestation.pb.go
+                  grep -q "HardwareAttestedClaims" build/spire-api-sdk/proto/spire/api/types/sovereignattestation.pb.go
+                  echo "✅ Custom types present in generated code"
+
+            - name: Upload Build Artifacts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: spire-build-v${{ matrix.spire-version }}
+                  path: |
+                      build/spire-binaries/
+                      build/BUILD_INFO.txt
+                  retention-days: 7
+
     integration-test:
         name: Hybrid Cloud PoC Integration Test
         runs-on: self-hosted

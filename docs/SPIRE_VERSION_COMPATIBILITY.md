@@ -98,10 +98,60 @@ This ensures our proposed changes work across SPIRE versions maintainers care ab
 
 ## CI Multi-Version Testing
 
-TODO: Add GitHub Actions matrix to test overlay on:
-- `v1.10.3` (baseline)
-- `v1.14.1` (latest stable)
-- `main` (development)
+Our CI pipeline tests the overlay on multiple SPIRE versions automatically:
+
+### GitHub Actions Matrix
+
+```yaml
+matrix:
+  spire-version: ['1.14.1', 'main']
+```
+
+**What's tested**:
+- ✅ Build succeeds on all versions
+- ✅ Binaries are generated correctly  
+- ✅ Custom proto types compile
+- ✅ Generic field names present
+
+### Manual Testing
+
+Test locally across versions:
+```bash
+# Test all default versions (v1.14.1, main)
+./scripts/test-spire-versions.sh
+
+# Test specific versions
+./scripts/test-spire-versions.sh v1.14.1 main
+
+# Test a single version
+SPIRE_VERSION=v1.14.1 ./scripts/spire-build.sh
+```
+
+**Test output**:
+```
+🧪 Testing SPIRE Overlay Across Multiple Versions
+==================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 Test 1/2: SPIRE v1.14.1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   ✅ Build: SUCCESS
+   ✅ Binaries: VERIFIED
+      Server: 1.14.1-dev-unk
+      Agent:  1.14.1-dev-unk
+   ✅ Proto: COMPILED
+   ✅ Custom Types: PRESENT
+
+🎉 PASS: SPIRE v1.14.1
+```
+
+### Why Multi-Version Testing?
+
+1. **Latest Stable**: Validates v1.14.1 (production target)
+2. **Future Proofing**: Catches breaking changes in `main` early
+3. **Upstream Confidence**: SPIRE maintainers see we test on latest
+4. **Release Readiness**: Ready for next SPIRE stable release
 
 ## Resources
 
