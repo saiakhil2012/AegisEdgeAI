@@ -10,7 +10,11 @@ BUILD_DIR="$PROJECT_ROOT/build"
 OVERLAY_DIR="$PROJECT_ROOT/spire-overlay"
 
 # Configuration
-SPIRE_VERSION="${SPIRE_VERSION:-v1.10.3}"
+SPIRE_VERSION="${SPIRE_VERSION:-v1.14.1}"
+# spire-api-sdk uses its own versioning (pseudoversion based on main branch).
+# This commit corresponds to the SDK version pinned in SPIRE v1.14.1's go.mod:
+#   github.com/spiffe/spire-api-sdk v1.2.5-0.20251107171659-13527c331abf
+SPIRE_API_SDK_COMMIT="${SPIRE_API_SDK_COMMIT:-13527c331abf}"
 SPIRE_REPO="https://github.com/spiffe/spire.git"
 SPIRE_API_SDK_REPO="https://github.com/spiffe/spire-api-sdk.git"
 
@@ -37,8 +41,11 @@ echo "📦 Cloning SPIRE ${SPIRE_VERSION}..."
 git clone --branch "$SPIRE_VERSION" --depth 1 "$SPIRE_REPO" "$BUILD_DIR/spire" --quiet
 
 # Clone SPIRE API SDK (needed for proto files)
-echo "📦 Cloning SPIRE API SDK..."
-git clone --branch "$SPIRE_VERSION" --depth 1 "$SPIRE_API_SDK_REPO" "$BUILD_DIR/spire-api-sdk" --quiet
+# The SDK does not mirror SPIRE's version tags – it uses its own versioning scheme.
+# We check out the specific commit pinned in SPIRE v1.14.1's go.mod.
+echo "📦 Cloning SPIRE API SDK (commit ${SPIRE_API_SDK_COMMIT})..."
+git clone "$SPIRE_API_SDK_REPO" "$BUILD_DIR/spire-api-sdk" --quiet
+(cd "$BUILD_DIR/spire-api-sdk" && git checkout "$SPIRE_API_SDK_COMMIT" --quiet)
 
 echo "   ✓ SPIRE and API SDK cloned"
 echo ""

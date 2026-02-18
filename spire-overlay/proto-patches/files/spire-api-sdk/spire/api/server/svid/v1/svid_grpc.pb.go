@@ -21,8 +21,10 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	SVID_MintX509SVID_FullMethodName        = "/spire.api.server.svid.v1.SVID/MintX509SVID"
 	SVID_MintJWTSVID_FullMethodName         = "/spire.api.server.svid.v1.SVID/MintJWTSVID"
+	SVID_MintWITSVID_FullMethodName         = "/spire.api.server.svid.v1.SVID/MintWITSVID"
 	SVID_BatchNewX509SVID_FullMethodName    = "/spire.api.server.svid.v1.SVID/BatchNewX509SVID"
 	SVID_NewJWTSVID_FullMethodName          = "/spire.api.server.svid.v1.SVID/NewJWTSVID"
+	SVID_BatchNewWITSVID_FullMethodName     = "/spire.api.server.svid.v1.SVID/BatchNewWITSVID"
 	SVID_NewDownstreamX509CA_FullMethodName = "/spire.api.server.svid.v1.SVID/NewDownstreamX509CA"
 )
 
@@ -40,6 +42,11 @@ type SVIDClient interface {
 	//
 	// The caller must be local or present an admin X509-SVID.
 	MintJWTSVID(ctx context.Context, in *MintJWTSVIDRequest, opts ...grpc.CallOption) (*MintJWTSVIDResponse, error)
+	// Mints a one-off WIT-SVID outside of the normal node/workload
+	// registration process.
+	//
+	// The caller must be local or present an admin X509-SVID.
+	MintWITSVID(ctx context.Context, in *MintWITSVIDRequest, opts ...grpc.CallOption) (*MintWITSVIDResponse, error)
 	// Creates one or more X509-SVIDs from registration entries.
 	//
 	// The caller must present an active agent X509-SVID that is authorized
@@ -50,6 +57,11 @@ type SVIDClient interface {
 	// The caller must present an active agent X509-SVID that is authorized
 	// to mint the requested entry. See the Entry GetAuthorizedEntries RPC.
 	NewJWTSVID(ctx context.Context, in *NewJWTSVIDRequest, opts ...grpc.CallOption) (*NewJWTSVIDResponse, error)
+	// Creates one or more WIT-SVIDs from registration entries.
+	//
+	// The caller must present an active agent X509-SVID that is authorized
+	// to mint the requested entries. See the Entry GetAuthorizedEntries/SyncA RPC.
+	BatchNewWITSVID(ctx context.Context, in *BatchNewWITSVIDRequest, opts ...grpc.CallOption) (*BatchNewWITSVIDResponse, error)
 	// Creates an X509 CA certificate appropriate for use by a downstream
 	// entity to mint X509-SVIDs.
 	//
@@ -83,6 +95,15 @@ func (c *sVIDClient) MintJWTSVID(ctx context.Context, in *MintJWTSVIDRequest, op
 	return out, nil
 }
 
+func (c *sVIDClient) MintWITSVID(ctx context.Context, in *MintWITSVIDRequest, opts ...grpc.CallOption) (*MintWITSVIDResponse, error) {
+	out := new(MintWITSVIDResponse)
+	err := c.cc.Invoke(ctx, SVID_MintWITSVID_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sVIDClient) BatchNewX509SVID(ctx context.Context, in *BatchNewX509SVIDRequest, opts ...grpc.CallOption) (*BatchNewX509SVIDResponse, error) {
 	out := new(BatchNewX509SVIDResponse)
 	err := c.cc.Invoke(ctx, SVID_BatchNewX509SVID_FullMethodName, in, out, opts...)
@@ -95,6 +116,15 @@ func (c *sVIDClient) BatchNewX509SVID(ctx context.Context, in *BatchNewX509SVIDR
 func (c *sVIDClient) NewJWTSVID(ctx context.Context, in *NewJWTSVIDRequest, opts ...grpc.CallOption) (*NewJWTSVIDResponse, error) {
 	out := new(NewJWTSVIDResponse)
 	err := c.cc.Invoke(ctx, SVID_NewJWTSVID_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sVIDClient) BatchNewWITSVID(ctx context.Context, in *BatchNewWITSVIDRequest, opts ...grpc.CallOption) (*BatchNewWITSVIDResponse, error) {
+	out := new(BatchNewWITSVIDResponse)
+	err := c.cc.Invoke(ctx, SVID_BatchNewWITSVID_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +154,11 @@ type SVIDServer interface {
 	//
 	// The caller must be local or present an admin X509-SVID.
 	MintJWTSVID(context.Context, *MintJWTSVIDRequest) (*MintJWTSVIDResponse, error)
+	// Mints a one-off WIT-SVID outside of the normal node/workload
+	// registration process.
+	//
+	// The caller must be local or present an admin X509-SVID.
+	MintWITSVID(context.Context, *MintWITSVIDRequest) (*MintWITSVIDResponse, error)
 	// Creates one or more X509-SVIDs from registration entries.
 	//
 	// The caller must present an active agent X509-SVID that is authorized
@@ -134,6 +169,11 @@ type SVIDServer interface {
 	// The caller must present an active agent X509-SVID that is authorized
 	// to mint the requested entry. See the Entry GetAuthorizedEntries RPC.
 	NewJWTSVID(context.Context, *NewJWTSVIDRequest) (*NewJWTSVIDResponse, error)
+	// Creates one or more WIT-SVIDs from registration entries.
+	//
+	// The caller must present an active agent X509-SVID that is authorized
+	// to mint the requested entries. See the Entry GetAuthorizedEntries/SyncA RPC.
+	BatchNewWITSVID(context.Context, *BatchNewWITSVIDRequest) (*BatchNewWITSVIDResponse, error)
 	// Creates an X509 CA certificate appropriate for use by a downstream
 	// entity to mint X509-SVIDs.
 	//
@@ -152,11 +192,17 @@ func (UnimplementedSVIDServer) MintX509SVID(context.Context, *MintX509SVIDReques
 func (UnimplementedSVIDServer) MintJWTSVID(context.Context, *MintJWTSVIDRequest) (*MintJWTSVIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MintJWTSVID not implemented")
 }
+func (UnimplementedSVIDServer) MintWITSVID(context.Context, *MintWITSVIDRequest) (*MintWITSVIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MintWITSVID not implemented")
+}
 func (UnimplementedSVIDServer) BatchNewX509SVID(context.Context, *BatchNewX509SVIDRequest) (*BatchNewX509SVIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchNewX509SVID not implemented")
 }
 func (UnimplementedSVIDServer) NewJWTSVID(context.Context, *NewJWTSVIDRequest) (*NewJWTSVIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewJWTSVID not implemented")
+}
+func (UnimplementedSVIDServer) BatchNewWITSVID(context.Context, *BatchNewWITSVIDRequest) (*BatchNewWITSVIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchNewWITSVID not implemented")
 }
 func (UnimplementedSVIDServer) NewDownstreamX509CA(context.Context, *NewDownstreamX509CARequest) (*NewDownstreamX509CAResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewDownstreamX509CA not implemented")
@@ -210,6 +256,24 @@ func _SVID_MintJWTSVID_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SVID_MintWITSVID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MintWITSVIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SVIDServer).MintWITSVID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SVID_MintWITSVID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SVIDServer).MintWITSVID(ctx, req.(*MintWITSVIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SVID_BatchNewX509SVID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BatchNewX509SVIDRequest)
 	if err := dec(in); err != nil {
@@ -242,6 +306,24 @@ func _SVID_NewJWTSVID_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SVIDServer).NewJWTSVID(ctx, req.(*NewJWTSVIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SVID_BatchNewWITSVID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchNewWITSVIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SVIDServer).BatchNewWITSVID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SVID_BatchNewWITSVID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SVIDServer).BatchNewWITSVID(ctx, req.(*BatchNewWITSVIDRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -280,12 +362,20 @@ var SVID_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SVID_MintJWTSVID_Handler,
 		},
 		{
+			MethodName: "MintWITSVID",
+			Handler:    _SVID_MintWITSVID_Handler,
+		},
+		{
 			MethodName: "BatchNewX509SVID",
 			Handler:    _SVID_BatchNewX509SVID_Handler,
 		},
 		{
 			MethodName: "NewJWTSVID",
 			Handler:    _SVID_NewJWTSVID_Handler,
+		},
+		{
+			MethodName: "BatchNewWITSVID",
+			Handler:    _SVID_BatchNewWITSVID_Handler,
 		},
 		{
 			MethodName: "NewDownstreamX509CA",

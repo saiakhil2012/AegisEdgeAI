@@ -213,7 +213,7 @@ message RenewAgentResponse {
     // Optional challenge nonce for TPM Quote generation. If present, the agent
     // should use this nonce to build SovereignAttestation and call RenewAgent again.
     // This enables the server to ensure freshness of TPM attestation.
-    optional bytes challenge_nonce = 3;
+    bytes challenge_nonce = 3;
 }
 
 message CreateJoinTokenRequest {
@@ -238,7 +238,7 @@ message AgentX509SVIDParams {
 
     // Unified-Identity - Phase 1: SPIRE API & Policy Staging (Stubbed Keylime)
     // Optional SovereignAttestation payload sent by the agent during bootstrap/renewal.
-    optional spire.api.types.SovereignAttestation sovereign_attestation = 2;
+    spire.api.types.SovereignAttestation sovereign_attestation = 2;
 }
 
 message PostStatusRequest {
