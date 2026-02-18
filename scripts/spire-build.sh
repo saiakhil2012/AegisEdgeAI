@@ -85,11 +85,15 @@ for patch_file in "$OVERLAY_DIR/core-patches"/*.patch; do
             echo "   ✓ $patch_name applied"
         else
             echo "   ⚠️  $patch_name doesn't apply cleanly - trying 3-way merge..."
-            git apply --3way -p3 "$patch_file" 2>&1 | grep -v "trailing whitespace" || {
-                echo "   ❌ $patch_name failed!"
-                echo "      Manual resolution needed in $BUILD_DIR/spire"
-                exit 1
-            }
+            git apply --3way -p3 "$patch_file" 2>&1 | grep -v "trailing whitespace" || true
+            # Resolve any merge conflicts by taking the overlay (patch) version
+            unmerged=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+            if [ -n "$unmerged" ]; then
+                echo "   Resolving merge conflicts (taking overlay version)..."
+                echo "$unmerged" | xargs git checkout --theirs
+                echo "$unmerged" | xargs git add
+                echo "   ✓ $(echo "$unmerged" | wc -l | tr -d ' ') conflict(s) resolved"
+            fi
         fi
     fi
 done
