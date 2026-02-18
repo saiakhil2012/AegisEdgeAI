@@ -50,23 +50,32 @@ echo "🔧 Installing proto files..."
 if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk" ]; then
     echo "   Copying custom proto files to spire-api-sdk..."
     
-    # Update spire-api-sdk proto files
+    # Update spire-api-sdk proto files and pre-generated Go types
     if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/types" ]; then
         cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/types"/*.proto \
               "$BUILD_DIR/spire-api-sdk/proto/spire/api/types/" 2>/dev/null || true
+        # Copy pre-generated .pb.go files (avoids dependency on SDK Makefile proto regen)
+        cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/types"/*.pb.go \
+              "$BUILD_DIR/spire-api-sdk/proto/spire/api/types/" 2>/dev/null || true
     fi
-    
+
     if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/agent/v1" ]; then
         cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/agent/v1"/*.proto \
               "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/agent/v1/" 2>/dev/null || true
+        # Copy pre-generated .pb.go files (replaces v1.10.3 bindings which lack our custom fields)
+        cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/agent/v1"/*.pb.go \
+              "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/agent/v1/" 2>/dev/null || true
     fi
-    
+
     if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/svid/v1" ]; then
         cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/svid/v1"/*.proto \
               "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/svid/v1/" 2>/dev/null || true
+        # Copy pre-generated .pb.go files (replaces v1.10.3 bindings which lack our custom fields)
+        cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/svid/v1"/*.pb.go \
+              "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/svid/v1/" 2>/dev/null || true
     fi
-    
-    echo "   ✓ Proto files installed"
+
+    echo "   ✓ Proto files and pre-generated Go types installed"
 else
     echo "   ⚠️  No proto files found in overlay"
 fi
@@ -118,6 +127,12 @@ if [ -d "$OVERLAY_DIR/cache-packages/nodecache" ]; then
     mkdir -p pkg/server/cache/nodecache
     cp -r "$OVERLAY_DIR/cache-packages/nodecache"/* pkg/server/cache/nodecache/
     echo "   ✓ nodecache package installed"
+fi
+
+# Install util extensions (MustCast generic helper required by the patches)
+if [ -d "$OVERLAY_DIR/common-packages/utilcast" ]; then
+    cp -r "$OVERLAY_DIR/common-packages/utilcast"/* pkg/common/util/
+    echo "   ✓ util extensions installed (MustCast)"
 fi
 
 # Apply patches AFTER common packages are installed
