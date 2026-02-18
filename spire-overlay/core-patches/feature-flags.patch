@@ -3,7 +3,7 @@ new file mode 100644
 index 00000000..022c950a
 --- /dev/null
 +++ b/hybrid-cloud-poc/spire/pkg/common/fflag/fflag.go
-@@ -0,0 +1,138 @@
+@@ -0,0 +1,143 @@
 +// The fflag package implements a basic singleton pattern for the purpose of
 +// providing SPIRE with a system-wide feature flagging facility. Feature flags
 +// can be easily added here, in a single central location, and be consumed
