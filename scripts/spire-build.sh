@@ -212,6 +212,11 @@ if [ -d "$OVERLAY_DIR/plugins/server-api-bundle-wit" ]; then
     echo "   ✓ Bundle WIT interface stubs installed (PublishWITAuthority)"
 fi
 
+if [ -d "$OVERLAY_DIR/plugins/server-api-localauthority-wit" ]; then
+    cp -r "$OVERLAY_DIR/plugins/server-api-localauthority-wit"/* pkg/server/api/localauthority/v1/
+    echo "   ✓ LocalAuthority WIT interface stubs installed (ActivateWITAuthority et al)"
+fi
+
 # Update go.mod to use local spire-api-sdk
 echo ""
 echo "📝 Updating go.mod to use local spire-api-sdk..."

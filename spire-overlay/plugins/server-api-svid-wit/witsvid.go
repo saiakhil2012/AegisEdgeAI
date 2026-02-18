@@ -14,6 +14,13 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+// MintWITSVID implements svidv1.SVIDServer.
+// WIT-SVID functionality is not yet implemented.
+func (s *Service) MintWITSVID(ctx context.Context, req *svidv1.MintWITSVIDRequest) (*svidv1.MintWITSVIDResponse, error) {
+	log := rpccontext.Logger(ctx)
+	return nil, api.MakeErr(log, codes.Unimplemented, "WIT-SVID functionality is not yet implemented", nil)
+}
+
 // BatchNewWITSVID implements svidv1.SVIDServer.
 // WIT-SVID functionality is not yet implemented.
 func (s *Service) BatchNewWITSVID(ctx context.Context, req *svidv1.BatchNewWITSVIDRequest) (*svidv1.BatchNewWITSVIDResponse, error) {
