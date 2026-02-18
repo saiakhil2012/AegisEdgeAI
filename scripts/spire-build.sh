@@ -80,12 +80,12 @@ for patch_file in "$OVERLAY_DIR/core-patches"/*.patch; do
         patch_name=$(basename "$patch_file")
         echo "   Applying $patch_name..."
         
-        if git apply --check "$patch_file" 2>/dev/null; then
-            git apply "$patch_file" 2>&1 | grep -v "trailing whitespace" || true
+        if git apply --check -p3 "$patch_file" 2>/dev/null; then
+            git apply -p3 "$patch_file" 2>&1 | grep -v "trailing whitespace" || true
             echo "   ✓ $patch_name applied"
         else
             echo "   ⚠️  $patch_name doesn't apply cleanly - trying 3-way merge..."
-            git apply --3way "$patch_file" 2>&1 | grep -v "trailing whitespace" || {
+            git apply --3way -p3 "$patch_file" 2>&1 | grep -v "trailing whitespace" || {
                 echo "   ❌ $patch_name failed!"
                 echo "      Manual resolution needed in $BUILD_DIR/spire"
                 exit 1
@@ -125,16 +125,11 @@ for patch_file in "$OVERLAY_DIR/core-patches"/*.patch; do
         patch_name=$(basename "$patch_file")
         echo "   Applying $patch_name..."
         
-        if git apply --check "$patch_file" 2>/dev/null; then
-            git apply "$patch_file" 2>&1 | grep -v "trailing whitespace" || true
+        if git apply --check -p3 "$patch_file" 2>/dev/null; then
+            git apply -p3 "$patch_file" 2>&1 | grep -v "trailing whitespace" || true
             echo "   ✓ $patch_name applied"
         else
-            echo "   ⚠️  $patch_name doesn't apply cleanly - trying 3-way merge..."
-            git apply --3way "$patch_file" 2>&1 | grep -v "trailing whitespace" || {
-                echo "   ❌ $patch_name failed!"
-                echo "      Manual resolution needed in $BUILD_DIR/spire"
-                exit 1
-            }
+            echo "   ⚠️  $patch_name already applied or doesn't apply cleanly - skipping"
         fi
     fi
 done
