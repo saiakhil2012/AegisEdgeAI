@@ -756,7 +756,9 @@ Options:
   -h, --help           Show this help message.
 
 Environment Variables:
-  SPIRE_AGENT_SVID_RENEWAL_INTERVAL  SVID renewal interval in seconds (default: 86400 = 24h, min: 30s)
+  SPIRE_AGENT_SVID_RENEWAL_INTERVAL  SVID renewal interval in seconds (default: 86400 = 24h, min: 86400)
+                                       SPIRE v1.14.1 requires availability_target >= 24h.
+                                       Renewals still occur frequently because agent_ttl (60s) < availability_target (24h).
                                       When set, automatically configures agent config file
 
 Note: By default, all components continue running after script exit. Use --exit-cleanup
@@ -793,11 +795,12 @@ else
 fi
 
 # SVID renewal configuration: Allow override via environment variable
-# Default: 30s for fast demo renewals, minimum: 30s
-SPIRE_AGENT_SVID_RENEWAL_INTERVAL="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-30}"
+# Default: 86400s (24h) - SPIRE v1.14.1 requires availability_target >= 24h.
+# Renewals still happen frequently because agent_ttl=60s is always < 24h.
+SPIRE_AGENT_SVID_RENEWAL_INTERVAL="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-86400}"
 export SPIRE_AGENT_SVID_RENEWAL_INTERVAL
-# Minimum allowed renewal interval (30 seconds)
-MIN_SVID_RENEWAL_INTERVAL=30
+# Minimum allowed renewal interval (SPIRE v1.14.1 enforces >= 24h for availability_target)
+MIN_SVID_RENEWAL_INTERVAL=86400
 
 # Convert seconds to SPIRE format (e.g., 300s -> 5m, 60s -> 1m)
 convert_seconds_to_spire_duration() {
@@ -932,24 +935,14 @@ configure_spire_agent_svid_renewal() {
         return 1
     fi
 
-    # Validate minimum renewal interval based on Unified-Identity feature flag
-    # Unified-Identity enabled: 30s minimum
-    # Unified-Identity disabled: 24h (86400s) minimum for backward compatibility
-    local unified_identity_enabled="${UNIFIED_IDENTITY_ENABLED:-true}"
-    local min_interval
-
-    if [ "$unified_identity_enabled" = "true" ] || [ "$unified_identity_enabled" = "1" ] || [ "$unified_identity_enabled" = "yes" ]; then
-        min_interval=30  # Unified-Identity allows 30s minimum
-    else
-        min_interval=86400  # Legacy 24h minimum when Unified-Identity is disabled
-    fi
+    # Validate minimum renewal interval
+    # SPIRE v1.14.1 enforces availability_target >= 24h0m0s
+    local min_interval=86400  # 24h minimum enforced by SPIRE v1.14.1
 
     if [ "$renewal_interval_seconds" -lt "$min_interval" ]; then
-        echo -e "${RED}    ✗ Error: SVID renewal interval must be at least ${min_interval}s (provided: ${renewal_interval_seconds}s)${NC}"
-        if [ "$min_interval" -eq 86400 ]; then
-            echo -e "${YELLOW}    Note: 30s minimum requires Unified-Identity feature flag to be enabled${NC}"
-        fi
-        return 1
+        echo -e "${YELLOW}    ⚠ SVID renewal interval ${renewal_interval_seconds}s < 24h minimum (SPIRE v1.14.1).${NC}"
+        echo -e "${YELLOW}    Setting availability_target to 24h (86400s). Renewals still occur because agent_ttl < 24h.${NC}"
+        renewal_interval_seconds=86400
     fi
 
     # Convert seconds to SPIRE duration format
@@ -1007,7 +1000,7 @@ configure_spire_agent_svid_renewal() {
 # Function to wait for exactly one agent SVID renewal
 wait_for_one_agent_svid_renewal() {
     local max_wait="${1:-120}"  # Maximum time to wait in seconds
-    local renewal_interval="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-30}"
+    local renewal_interval="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-86400}"
 
     echo ""
     echo -e "${CYAN}  Waiting for one agent SVID renewal (max ${max_wait}s)...${NC}"
@@ -3361,7 +3354,7 @@ COMPONENTS_OK=true
 
         # Configure agent with renewal interval if set
         AGENT_CONFIG="${PROJECT_DIR}/python-app-demo/spire-agent.conf"
-        renewal_interval="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-30}"
+        renewal_interval="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-86400}"
         if [ -n "${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-}" ]; then
             configure_spire_agent_svid_renewal "$AGENT_CONFIG" "$renewal_interval" || {
                 echo -e "${YELLOW}  ⚠ Failed to configure renewal interval, using default${NC}"
@@ -3456,7 +3449,7 @@ echo -e "${CYAN}Step 14: Testing SPIRE Agent SVID Renewal...${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Determine max wait time based on renewal interval
-renewal_interval="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-30}"
+renewal_interval="${SPIRE_AGENT_SVID_RENEWAL_INTERVAL:-86400}"
 # Wait for 1 renewal cycle + buffer (minimum 60 seconds)
 max_wait=$((renewal_interval + 30))
 if [ "$max_wait" -lt 60 ]; then
