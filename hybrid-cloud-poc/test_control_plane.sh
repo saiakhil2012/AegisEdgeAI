@@ -868,13 +868,14 @@ configure_spire_server_agent_ttl() {
 }
 
 # Unified-Identity - Verification: Configure unifiedidentity plugin with strict TLS (Task 7)
+# The spire-server.conf has placeholder values (KEYLIME_TLS_CERT_PLACEHOLDER etc.);
+# this function just replaces those with the actual runtime paths via sed.
 configure_spire_server_unified_identity() {
     local server_config="$1"
     local keylime_url="${2:-https://localhost:8881}"
     local tls_cert="${3}"
     local tls_key="${4}"
     local ca_cert="${5}"
-    local server_name="${6:-server}"
 
     echo "    Configuring SPIRE server unifiedidentity plugin with strict TLS..."
     echo "      URL: ${keylime_url}"
@@ -885,51 +886,15 @@ configure_spire_server_unified_identity() {
         return 1
     fi
 
-    # Create a backup
-    local backup_config="${server_config}.bak.$$"
-    cp "$server_config" "$backup_config" 2>/dev/null || true
-
-    # Remove existing unifiedidentity plugin configuration if it exists to ensure fresh config
-    if grep -q "CredentialComposer \"unifiedidentity\"" "$server_config"; then
-        awk '
-            BEGIN { skip = 0; braces = 0 }
-            /CredentialComposer "unifiedidentity"/ {
-                skip = 1;
-                line = $0;
-                braces += gsub(/\{/, "{", line);
-                braces -= gsub(/\}/, "}", line);
-                if (braces <= 0) skip = 0;
-                next
-            }
-            skip {
-                line = $0;
-                braces += gsub(/\{/, "{", line);
-                braces -= gsub(/\}/, "}", line);
-                if (braces <= 0) { skip = 0; next }
-                next
-            }
-            { print }
-        ' "$server_config" > "${server_config}.tmp" && mv "${server_config}.tmp" "$server_config"
-    fi
-
-    # Add the plugin configuration to the plugins block
-    awk -v url="$keylime_url" -v cert="$tls_cert" -v key="$tls_key" -v ca="$ca_cert" -v name="$server_name" '
-        /plugins \{/ {
-            print
-            print "    CredentialComposer \"unifiedidentity\" {"
-            print "        plugin_data {"
-            print "            keylime_url = \"" url "\""
-            print "            tls_cert = \"" cert "\""
-            print "            tls_key = \"" key "\""
-            print "            ca_cert = \"" ca "\""
-            print "            server_name = \"" name "\""
-            print "            allowed_geolocations = [\"*\"]"
-            print "        }"
-            print "    }"
-            next
-        }
-        { print }
-    ' "$server_config" > "${server_config}.tmp" && mv "${server_config}.tmp" "$server_config"
+    # Replace TLS paths in the CredentialComposer block.
+    # Pattern replaces any current value (placeholder or real path) so it is idempotent
+    # across multiple test runs on the same checkout.
+    sed -i \
+        -e "s|^\( *tls_cert *= *\)\"[^\"]*\"|\1\"${tls_cert}\"|" \
+        -e "s|^\( *tls_key *= *\)\"[^\"]*\"|\1\"${tls_key}\"|" \
+        -e "s|^\( *ca_cert *= *\)\"[^\"]*\"|\1\"${ca_cert}\"|" \
+        -e "s|^\( *keylime_url *= *\)\"[^\"]*\"|\1\"${keylime_url}\"|" \
+        "$server_config"
 
     return 0
 }
