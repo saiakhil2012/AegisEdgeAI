@@ -199,6 +199,19 @@ if [ -d "$OVERLAY_DIR/plugins/server-credentialcomposer-unifiedidentity" ]; then
     echo "   ✓ Unified identity credential composer installed"
 fi
 
+# Install v1.14.1 WIT stub methods (BatchNewWITSVID / PublishWITAuthority).
+# These satisfy the updated gRPC server interfaces added in v1.14.1 whose
+# implementations were stripped when patch conflicts were resolved with --theirs.
+if [ -d "$OVERLAY_DIR/plugins/server-api-svid-wit" ]; then
+    cp -r "$OVERLAY_DIR/plugins/server-api-svid-wit"/* pkg/server/api/svid/v1/
+    echo "   ✓ SVID WIT interface stubs installed (BatchNewWITSVID)"
+fi
+
+if [ -d "$OVERLAY_DIR/plugins/server-api-bundle-wit" ]; then
+    cp -r "$OVERLAY_DIR/plugins/server-api-bundle-wit"/* pkg/server/api/bundle/v1/
+    echo "   ✓ Bundle WIT interface stubs installed (PublishWITAuthority)"
+fi
+
 # Update go.mod to use local spire-api-sdk
 echo ""
 echo "📝 Updating go.mod to use local spire-api-sdk..."
