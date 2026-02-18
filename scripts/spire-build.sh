@@ -242,17 +242,24 @@ else
 fi
 cd "$BUILD_DIR/spire"
 
-# Register plugins in catalog
+# Register plugins in catalog (overlay files replace upstream catalog files)
 echo ""
 echo "📝 Registering plugins in catalog..."
 
-# Check if agent catalog needs update
-AGENT_CATALOG="pkg/agent/plugin/nodeattestor/catalog.go"
-if ! grep -q "unifiedidentity" "$AGENT_CATALOG" 2>/dev/null; then
-    echo "   ⚠️  Agent catalog not auto-registered"
-    echo "      You may need to manually add unifiedidentity to $AGENT_CATALOG"
+if [ -f "$OVERLAY_DIR/catalog-patches/server-credentialcomposer-catalog.go" ]; then
+    cp "$OVERLAY_DIR/catalog-patches/server-credentialcomposer-catalog.go" \
+       pkg/server/catalog/credentialcomposer.go
+    echo "   ✓ Server CredentialComposer catalog updated (unifiedidentity registered)"
 else
-    echo "   ✓ Agent catalog already includes unifiedidentity"
+    echo "   ⚠️  server-credentialcomposer-catalog.go not found in overlay"
+fi
+
+if [ -f "$OVERLAY_DIR/catalog-patches/agent-nodeattestor-catalog.go" ]; then
+    cp "$OVERLAY_DIR/catalog-patches/agent-nodeattestor-catalog.go" \
+       pkg/agent/catalog/nodeattestor.go
+    echo "   ✓ Agent NodeAttestor catalog updated (unifiedidentity registered)"
+else
+    echo "   ⚠️  agent-nodeattestor-catalog.go not found in overlay"
 fi
 
 # Regenerate proto (this will use our modified spire-api-sdk)
