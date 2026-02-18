@@ -5,7 +5,8 @@ package util
 // the type parameter T is needed explicitly (e.g., integer code conversions).
 //
 // Usage:
-//   code := util.MustCast[codes.Code](s.Code)
+//
+//	code := util.MustCast[codes.Code](s.Code)
 func MustCast[T any](v any) T {
 	return v.(T)
 }

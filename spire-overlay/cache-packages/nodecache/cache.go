@@ -92,8 +92,9 @@ func (c *Cache) Rebuild(ctx context.Context) error {
 	}
 
 	buildTime := c.clk.Now()
-	// Note: ValidAt was added in v1.11+; not available in v1.10.x so list all nodes.
-	resp, err := c.ds.ListAttestedNodes(ctx, &datastore.ListAttestedNodesRequest{})
+	resp, err := c.ds.ListAttestedNodes(ctx, &datastore.ListAttestedNodesRequest{
+		ValidAt: buildTime,
+	})
 	if err != nil {
 		return err
 	}

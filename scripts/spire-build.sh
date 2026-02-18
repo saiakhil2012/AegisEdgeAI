@@ -69,7 +69,7 @@ if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk" ]; then
     if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/agent/v1" ]; then
         cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/agent/v1"/*.proto \
               "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/agent/v1/" 2>/dev/null || true
-        # Copy pre-generated .pb.go files (replaces v1.10.3 bindings which lack our custom fields)
+        # Copy pre-generated .pb.go files (adds our custom SovereignAttestation fields)
         cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/agent/v1"/*.pb.go \
               "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/agent/v1/" 2>/dev/null || true
     fi
@@ -77,7 +77,7 @@ if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk" ]; then
     if [ -d "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/svid/v1" ]; then
         cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/svid/v1"/*.proto \
               "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/svid/v1/" 2>/dev/null || true
-        # Copy pre-generated .pb.go files (replaces v1.10.3 bindings which lack our custom fields)
+        # Copy pre-generated .pb.go files (adds our custom SovereignAttestation fields)
         cp -v "$OVERLAY_DIR/proto-patches/files/spire-api-sdk/spire/api/server/svid/v1"/*.pb.go \
               "$BUILD_DIR/spire-api-sdk/proto/spire/api/server/svid/v1/" 2>/dev/null || true
     fi
