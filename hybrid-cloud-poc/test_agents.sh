@@ -35,6 +35,8 @@ export KEYLIME_LOGGING_CONFIG="${KEYLIME_DIR}/logging.conf"
 PYTHON_KEYLIME_DIR="${KEYLIME_DIR}"
 RUST_KEYLIME_DIR="${SCRIPT_DIR}/rust-keylime"
 SPIRE_DIR="${SCRIPT_DIR}/spire"
+# SPIRE binaries are built by the overlay system into build/spire-binaries/
+SPIRE_BIN_DIR="${SCRIPT_DIR}/../build/spire-binaries"
 
 # Detect host IPs for flexible deployment
 # These should be set by test_integration.sh via environment variables
@@ -1103,7 +1105,7 @@ fetch_agent_svid() {
     mkdir -p "$(dirname "$output_file")" 2>/dev/null || true
 
     # 1. Primary Method: Use SPIRE Agent API (most reliable)
-    local spire_agent="${PROJECT_DIR}/spire/bin/spire-agent"
+    local spire_agent="${SPIRE_BIN_DIR}/spire-agent"
     if [ -f "$spire_agent" ] && [ -S "$agent_socket" ]; then
         echo "    Using SPIRE Agent API to fetch SVID..."
         # Extract directory and base name for the API call
@@ -1288,7 +1290,7 @@ else
 fi
 
 # Check SPIRE Server (port 8081)
-SPIRE_SERVER="${PROJECT_DIR}/spire/bin/spire-server"
+SPIRE_SERVER="${SPIRE_BIN_DIR}/spire-server"
 if [ -f "${SPIRE_SERVER}" ]; then
     if ! "${SPIRE_SERVER}" healthcheck -socketPath /tmp/spire-server/private/api.sock >/dev/null 2>&1; then
         echo -e "${RED}  ✗ SPIRE Server is not running or not ready${NC}"
@@ -2547,7 +2549,7 @@ export KEYLIME_AGENT_PORT="${KEYLIME_AGENT_PORT:-9002}"
 echo "  Using rust-keylime agent endpoint: ${KEYLIME_AGENT_IP}:${KEYLIME_AGENT_PORT}"
 
 # Check if SPIRE Agent binary exists or needs a rebuild
-SPIRE_AGENT="${PROJECT_DIR}/spire/bin/spire-agent"
+SPIRE_AGENT="${SPIRE_BIN_DIR}/spire-agent"
 NEEDS_REBUILD=false
 
 if [ ! -f "${SPIRE_AGENT}" ]; then
@@ -2557,9 +2559,10 @@ elif [ "${FORCE_BUILD:-false}" = "true" ]; then
     echo "  Forced build requested."
     NEEDS_REBUILD=true
 else
-    # Check if any .go file in spire directory is newer than the binary
-    if [ -n "$(find "${PROJECT_DIR}/spire" -name "*.go" -newer "${SPIRE_AGENT}" -print -quit 2>/dev/null)" ]; then
-        echo -e "${YELLOW}  ⚠ SPIRE Source code changes detected, rebuilding...${NC}"
+    # Check if SPIRE overlay patches are newer than binary
+    OVERLAY_DIR="${PROJECT_DIR}/../spire-overlay"
+    if [ -d "${OVERLAY_DIR}" ] && [ -n "$(find "${OVERLAY_DIR}" -name "*.patch" -newer "${SPIRE_AGENT}" -print -quit 2>/dev/null)" ]; then
+        echo -e "${YELLOW}  ⚠ SPIRE overlay patches modified, need rebuild...${NC}"
         NEEDS_REBUILD=true
     fi
 fi
@@ -2574,44 +2577,34 @@ if [ "$NEEDS_REBUILD" = "true" ]; then
         echo -e "${GREEN}============================================================${NC}"
         echo ""
         echo "To complete full integration test:"
-        echo "  1. Build SPIRE Agent: cd ${PROJECT_DIR}/spire && make bin/spire-agent"
+        echo "  1. Build SPIRE with overlay: cd ${PROJECT_DIR}/.. && ./scripts/spire-build.sh"
         echo "  2. Run this script again"
         exit 0
     else
-        echo -e "${YELLOW}  ⚠ SPIRE Agent binary not found, building...${NC}"
-        cd "${PROJECT_DIR}/spire"
+        echo -e "${YELLOW}  ⚠ SPIRE Agent binary not found, building with overlay system...${NC}"
+        cd "${PROJECT_DIR}/.."
 
-        # Ensure required files exist for Makefile
-        if [ ! -f ".go-version" ]; then
-            echo "1.25.3" > .go-version
-        fi
-        if [ ! -f ".spire-tool-versions" ]; then
-            cat > .spire-tool-versions << 'EOF'
-golangci-lint v1.60.0
-markdown_lint v0.40.0
-protoc 30.2
-EOF
-        fi
-
-        # Try building with Makefile first
-        if make bin/spire-agent > /tmp/spire-agent-build.log 2>&1; then
-            echo -e "${GREEN}  ✓ SPIRE Agent built successfully${NC}"
+        # Use SPIRE overlay build system
+        echo "    Building SPIRE with overlay system..."
+        if [ -x "./scripts/spire-build.sh" ]; then
+            ./scripts/spire-build.sh 2>&1 | tee /tmp/spire-overlay-build.log
+            BUILD_EXIT_CODE=${PIPESTATUS[0]}
         else
-            echo -e "${YELLOW}  ⚠ Makefile build failed, trying direct go build...${NC}"
-            # Fallback to direct go build if Makefile fails
-            mkdir -p bin
-            if go build -o bin/spire-agent ./cmd/spire-agent > /tmp/spire-agent-build.log 2>&1; then
-                echo -e "${GREEN}  ✓ SPIRE Agent built successfully (using go build)${NC}"
-            else
-                echo -e "${RED}  ✗ Failed to build SPIRE Agent${NC}"
-                echo "  Build log:"
-                tail -30 /tmp/spire-agent-build.log
-                echo ""
-                echo "  Troubleshooting:"
-                echo "    1. Ensure Go 1.25.3 is installed: go version"
-                echo "    2. Try building manually: cd ${PROJECT_DIR}/spire && make bin/spire-agent"
-                exit 1
-            fi
+            echo -e "${RED}    ✗ Build script not found: ./scripts/spire-build.sh${NC}"
+            exit 1
+        fi
+
+        if [ ${BUILD_EXIT_CODE} -eq 0 ] && [ -f "build/spire-binaries/spire-agent" ]; then
+            echo -e "${GREEN}    ✓ SPIRE Agent built successfully with overlay system${NC}"
+        else
+            echo -e "${RED}    ✗ SPIRE overlay build failed${NC}"
+            echo "    Check /tmp/spire-overlay-build.log for details"
+            echo ""
+            echo "  Troubleshooting:"
+            echo "    1. Check if Go is installed: go version"
+            echo "    2. Try building manually: ./scripts/spire-build.sh"
+            echo "    3. Check logs: cat /tmp/spire-overlay-build.log"
+            exit 1
         fi
         cd "${PROJECT_DIR}"
     fi
@@ -2898,14 +2891,14 @@ echo -e "${CYAN}Step 8: Creating registration entry for workload...${NC}"
 # Clean up any existing registration entries for the Python app workload
 # This prevents the creation script from needing to handle deletion
 WORKLOAD_SPIFFE_ID="spiffe://example.org/python-app"
-SPIRE_DIR="${PROJECT_DIR}/spire"
+SPIRE_SERVER_BIN="${SPIRE_BIN_DIR}/spire-server"
 SERVER_SOCKET="/tmp/spire-server/private/api.sock"
 
-if [ -S "$SERVER_SOCKET" ] && [ -f "${SPIRE_DIR}/bin/spire-server" ]; then
+if [ -S "$SERVER_SOCKET" ] && [ -f "${SPIRE_SERVER_BIN}" ]; then
     echo "  Cleaning up any existing registration entries for workload..."
-    if "${SPIRE_DIR}/bin/spire-server" healthcheck -socketPath "$SERVER_SOCKET" >/dev/null 2>&1; then
+    if "${SPIRE_SERVER_BIN}" healthcheck -socketPath "$SERVER_SOCKET" >/dev/null 2>&1; then
         # Check if entry exists for this workload SPIFFE ID
-        ENTRY_SHOW_OUTPUT=$("${SPIRE_DIR}/bin/spire-server" entry show \
+        ENTRY_SHOW_OUTPUT=$("${SPIRE_SERVER_BIN}" entry show \
             -spiffeID "$WORKLOAD_SPIFFE_ID" \
             -socketPath "$SERVER_SOCKET" 2>&1 || echo "")
 
@@ -2922,7 +2915,7 @@ if [ -S "$SERVER_SOCKET" ] && [ -f "${SPIRE_DIR}/bin/spire-server" ]; then
             if [ -n "$ENTRY_IDS" ]; then
                 while IFS= read -r entry_id; do
                     if [ -n "$entry_id" ]; then
-                        if "${SPIRE_DIR}/bin/spire-server" entry delete \
+                        if "${SPIRE_SERVER_BIN}" entry delete \
                             -entryID "$entry_id" \
                             -socketPath "$SERVER_SOCKET" >/dev/null 2>&1; then
                             ENTRY_COUNT=$((ENTRY_COUNT + 1))
@@ -3495,8 +3488,8 @@ if [ "$COMPONENTS_OK" = true ] || [ -S /tmp/spire-agent/public/api.sock ]; then
                     else
                         echo -e "${YELLOW}    ⚠ SPIRE bundle file not created, trying alternative method...${NC}"
                         # Try using SPIRE server CLI to get bundle
-                        if [ -f "${PROJECT_DIR}/spire/bin/spire-server" ]; then
-                            "${PROJECT_DIR}/spire/bin/spire-server" bundle show -format pem \
+                        if [ -f "${SPIRE_BIN_DIR}/spire-server" ]; then
+                            "${SPIRE_BIN_DIR}/spire-server" bundle show -format pem \
                                 -socketPath /tmp/spire-server/private/api.sock > "$SPIRE_BUNDLE" 2>/dev/null && \
                                 echo -e "${GREEN}    ✓ SPIRE trust bundle extracted via server CLI${NC}" || \
                                 echo -e "${YELLOW}    ⚠ Failed to extract bundle, continuing without verification${NC}"
@@ -3505,8 +3498,8 @@ if [ "$COMPONENTS_OK" = true ] || [ -S /tmp/spire-agent/public/api.sock ]; then
                 else
                     echo -e "${YELLOW}    ⚠ Failed to extract SPIRE bundle via Python script, trying server CLI...${NC}"
                     # Try using SPIRE server CLI as fallback
-                    if [ -f "${PROJECT_DIR}/spire/bin/spire-server" ]; then
-                        "${PROJECT_DIR}/spire/bin/spire-server" bundle show -format pem \
+                    if [ -f "${SPIRE_BIN_DIR}/spire-server" ]; then
+                        "${SPIRE_BIN_DIR}/spire-server" bundle show -format pem \
                             -socketPath /tmp/spire-server/private/api.sock > "$SPIRE_BUNDLE" 2>/dev/null && \
                             echo -e "${GREEN}    ✓ SPIRE trust bundle extracted via server CLI${NC}" || \
                             echo -e "${YELLOW}    ⚠ Failed to extract bundle, continuing without verification${NC}"
@@ -3515,8 +3508,8 @@ if [ "$COMPONENTS_OK" = true ] || [ -S /tmp/spire-agent/public/api.sock ]; then
             else
                 echo -e "${YELLOW}    ⚠ fetch-spire-bundle.py not found, trying server CLI...${NC}"
                 # Try using SPIRE server CLI
-                if [ -f "${PROJECT_DIR}/spire/bin/spire-server" ]; then
-                    "${PROJECT_DIR}/spire/bin/spire-server" bundle show -format pem \
+                if [ -f "${SPIRE_BIN_DIR}/spire-server" ]; then
+                    "${SPIRE_BIN_DIR}/spire-server" bundle show -format pem \
                         -socketPath /tmp/spire-server/private/api.sock > "$SPIRE_BUNDLE" 2>/dev/null && \
                         echo -e "${GREEN}    ✓ SPIRE trust bundle extracted via server CLI${NC}" || \
                         echo -e "${YELLOW}    ⚠ Failed to extract bundle, continuing without verification${NC}"
