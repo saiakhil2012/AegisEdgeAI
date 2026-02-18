@@ -1767,6 +1767,10 @@ if [ -f "${SERVER_CONFIG}" ]; then
     mkdir -p /tmp/spire-data/server
     rm -rf /tmp/spire-data/server/* 2>/dev/null || true
 
+    # Pre-create socket directory so SPIRE Server can bind immediately
+    # socket_path = "/tmp/spire-server/private/api.sock" in server config
+    mkdir -p /tmp/spire-server/private
+
     echo "    Starting SPIRE Server (logs: /tmp/spire-server.log)..."
     # Use setsid + nohup to ensure server continues running after script exits
     # setsid creates a new session, preventing SIGHUP when parent shell exits
@@ -1792,6 +1796,9 @@ for i in {1..30}; do
     fi
     if [ $i -eq 30 ]; then
         echo -e "${YELLOW}  ⚠ SPIRE Server may not be fully ready yet${NC}"
+        echo "  --- Last 40 lines of /tmp/spire-server.log ---"
+        tail -40 /tmp/spire-server.log 2>/dev/null || echo "  (log file not found)"
+        echo "  --- End of server log ---"
     fi
     sleep 1
 done
