@@ -1197,6 +1197,26 @@ if [ "$IS_TEST_MACHINE" = "true" ]; then
             printf '    [OK] Envoy started (PID: %s)\n' "$ENVOY_PID"
             # Restore terminal settings as Envoy/sudo might have messed them up (causing staircase output)
             stty sane 2>/dev/null || true
+            # Verify port 8080 is actually bound — process presence alone is not sufficient
+            # (Envoy may crash after startup due to bad WASM filter, port conflict, or cert error)
+            ENVOY_PORT_READY=false
+            for _i in 1 2 3 4 5; do
+                if ss -tlnp 2>/dev/null | grep -q ':8080' || netstat -tlnp 2>/dev/null | grep -q ':8080'; then
+                    ENVOY_PORT_READY=true
+                    break
+                fi
+                sleep 1
+            done
+            if [ "$ENVOY_PORT_READY" = "true" ]; then
+                printf '    [OK] Envoy is listening on port 8080\n'
+            else
+                printf '    [ERROR] Envoy process exists but port 8080 is not bound - Envoy may have crashed\n'
+                printf '    Check /opt/envoy/logs/envoy.log for details:\n'
+                if [ -f /opt/envoy/logs/envoy.log ]; then
+                    tail -25 /opt/envoy/logs/envoy.log | sed 's/^/      /'
+                fi
+                exit 1
+            fi
         else
             printf '    [ERROR] Envoy failed to start or died immediately - check /opt/envoy/logs/envoy.log\n'
             if [ -f /opt/envoy/logs/envoy.log ]; then

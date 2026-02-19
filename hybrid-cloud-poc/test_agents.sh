@@ -3632,7 +3632,7 @@ if [ -f "${SCRIPT_DIR}/workflow-ui/generate_workflow_ui.py" ]; then
         echo -e "${CYAN}    Local access: file:///tmp/workflow_visualization.html${NC}"
         if [ -f "${SCRIPT_DIR}/workflow-ui/serve_workflow_ui.py" ]; then
             echo -e "${CYAN}    HTTP access:  Run 'python3 ${SCRIPT_DIR}/workflow-ui/serve_workflow_ui.py' then visit:${NC}"
-            echo -e "${CYAN}                  http://${AGENTS_HOST_IP:-${AGENTS_HOST}}:8080/workflow_visualization.html${NC}"
+            echo -e "${CYAN}                  http://${AGENTS_HOST_IP:-${AGENTS_HOST}}:8090/workflow_visualization.html${NC}"
         fi
     else
         echo -e "${YELLOW}  ⚠ Warning: Failed to generate HTML visualization${NC}"

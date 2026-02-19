@@ -667,8 +667,15 @@ main() {
     # Unified-Identity: Critical Fix - Sync trust bundle again before mTLS test
     # The SPIRE root may have rotated during agent attestation.
     echo -e "${CYAN}Syncing trust bundle to Envoy one last time before mTLS test...${NC}"
-    run_on_onprem "cd \"${REMOTE_PROJ_DIR}/enterprise-private-cloud\" && env CONTROL_PLANE_HOST=${CONTROL_PLANE_HOST} ./test_onprem.sh --cleanup-only && env CONTROL_PLANE_HOST=${CONTROL_PLANE_HOST} ./test_onprem.sh --no-pause --no-build" > /dev/null 2>&1
-    echo -e "${GREEN}  ✓ Trust bundle synchronized and Envoy restarted${NC}"
+    ENVOY_RESTART_LOG="/tmp/envoy_restart_$(date +%s).log"
+    if run_on_onprem "cd \"${REMOTE_PROJ_DIR}/enterprise-private-cloud\" && env CONTROL_PLANE_HOST=${CONTROL_PLANE_HOST} ./test_onprem.sh --cleanup-only && env CONTROL_PLANE_HOST=${CONTROL_PLANE_HOST} ./test_onprem.sh --no-pause --no-build" > "${ENVOY_RESTART_LOG}" 2>&1; then
+        echo -e "${GREEN}  ✓ Trust bundle synchronized and Envoy restarted${NC}"
+    else
+        echo -e "${RED}  ✗ Envoy restart failed — mTLS test cannot proceed${NC}"
+        echo -e "${YELLOW}  Last 30 lines of Envoy restart log (${ENVOY_RESTART_LOG}):${NC}"
+        tail -30 "${ENVOY_RESTART_LOG}" | sed 's/^/    /'
+        exit 1
+    fi
     echo ""
     echo ""
 
