@@ -677,6 +677,35 @@ main() {
         exit 1
     fi
     echo ""
+
+    # Verify Envoy is STILL responding with TLS right before the mTLS client test.
+    # test_onprem.sh confirms port 8080 binds, but Envoy can crash shortly after SSH exits.
+    echo -e "${CYAN}  Verifying Envoy TLS is active before running mTLS client test...${NC}"
+    ENVOY_TLS_OK=false
+    for _tlsi in $(seq 1 6); do
+        # openssl s_client: CONNECTED = TLS handshake started (even if cert untrusted).
+        # "wrong version number" = plain HTTP on that port.
+        PROBE_OUT=$(run_on_onprem "echo | timeout 4 openssl s_client -connect localhost:8080 2>&1 | head -8" 2>/dev/null || true)
+        if echo "${PROBE_OUT}" | grep -qi 'CONNECTED\|Cipher\|SSL-Session\|certificate'; then
+            ENVOY_TLS_OK=true
+            break
+        elif echo "${PROBE_OUT}" | grep -qi 'wrong version\|http_request'; then
+            echo -e "${RED}  ✗ Port 8080 is serving PLAIN HTTP — Envoy TLS not active${NC}"
+            echo -e "${YELLOW}  Identifying the plain-HTTP service on port 8080:${NC}"
+            run_on_onprem "curl -s -m 2 -o /tmp/_port8080_body.txt http://localhost:8080/ 2>/dev/null; head -3 /tmp/_port8080_body.txt | sed 's/^/    /'" 2>/dev/null || true
+            run_on_onprem "sudo ss -tlnp | grep ':8080' | sed 's/^/    /'" 2>/dev/null || true
+            run_on_onprem "sudo lsof -i TCP:8080 -sTCP:LISTEN 2>/dev/null | sed 's/^/    /'" 2>/dev/null || true
+            echo -e "${RED}  Cannot proceed with mTLS test — Envoy must be running TLS on port 8080${NC}"
+            exit 1
+        fi
+        sleep 2
+    done
+    if [ "${ENVOY_TLS_OK}" = "true" ]; then
+        echo -e "${GREEN}  ✓ Envoy TLS is operational on port 8080${NC}"
+    else
+        echo -e "${YELLOW}  ⚠ Could not confirm Envoy TLS (no response within 12s) — attempting mTLS test anyway${NC}"
+        run_on_onprem "sudo ss -tlnp | grep ':8080' | sed 's/^/    /'" 2>/dev/null || true
+    fi
     echo ""
 
     # Prepare environment variables - SERVER_HOST should be ONPREM_HOST where Envoy is running
