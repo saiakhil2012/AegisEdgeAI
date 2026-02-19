@@ -1199,28 +1199,43 @@ if [ "$IS_TEST_MACHINE" = "true" ]; then
             stty sane 2>/dev/null || true
             # Verify port 8080 is actually bound — process presence alone is not sufficient
             # (Envoy may crash after startup due to bad WASM filter, port conflict, or cert error)
+            # Use sudo ss because Envoy runs as root via sudo setsid; non-root ss on some Ubuntu
+            # versions won't list root-owned sockets. Retry for up to 24s (12 × 2s sleeps).
             ENVOY_PORT_READY=false
-            for _i in 1 2 3 4 5; do
-                if ss -tlnp 2>/dev/null | grep -q ':8080' || netstat -tlnp 2>/dev/null | grep -q ':8080'; then
+            printf '    Waiting for Envoy to bind port 8080'
+            for _i in $(seq 1 12); do
+                # sudo ss: sees all sockets including root-owned
+                # lsof fallback: alternative if ss is unavailable
+                # bash /dev/tcp: lowest-common-denominator TCP connectivity check
+                if sudo ss -tlnp 2>/dev/null | grep -q ':8080' \
+                   || sudo lsof -i TCP:8080 -sTCP:LISTEN 2>/dev/null | grep -q . \
+                   || (bash -c 'echo >/dev/tcp/localhost/8080' 2>/dev/null); then
                     ENVOY_PORT_READY=true
                     break
                 fi
-                sleep 1
+                printf '.'
+                sleep 2
             done
+            printf '\n'
             if [ "$ENVOY_PORT_READY" = "true" ]; then
                 printf '    [OK] Envoy is listening on port 8080\n'
             else
-                printf '    [ERROR] Envoy process exists but port 8080 is not bound - Envoy may have crashed\n'
-                printf '    Check /opt/envoy/logs/envoy.log for details:\n'
+                # Show last 60 lines — the 25-line default is swamped by WASM worker init messages
+                # and hides any crash/error that appears after "starting main dispatch loop"
+                printf '    [ERROR] Envoy process exists but port 8080 is not bound after 24s\n'
+                printf '    Port status:\n'
+                sudo ss -tlnp 2>/dev/null | grep -E '8080|LISTEN' | sed 's/^/      /' || true
+                printf '    Last 60 lines of /opt/envoy/logs/envoy.log:\n'
                 if [ -f /opt/envoy/logs/envoy.log ]; then
-                    tail -25 /opt/envoy/logs/envoy.log | sed 's/^/      /'
+                    tail -60 /opt/envoy/logs/envoy.log | sed 's/^/      /'
                 fi
                 exit 1
             fi
         else
-            printf '    [ERROR] Envoy failed to start or died immediately - check /opt/envoy/logs/envoy.log\n'
+            printf '    [ERROR] Envoy failed to start or died immediately\n'
+            printf '    Last 60 lines of /opt/envoy/logs/envoy.log:\n'
             if [ -f /opt/envoy/logs/envoy.log ]; then
-                tail -20 /opt/envoy/logs/envoy.log | sed 's/^/      /'
+                tail -60 /opt/envoy/logs/envoy.log | sed 's/^/      /'
             fi
             exit 1
         fi
